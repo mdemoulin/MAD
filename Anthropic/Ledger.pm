@@ -22,9 +22,12 @@ use File::Path;
 use POSIX qw{strftime};
 use true;
 
-# Dollars per million tokens, from the pricing page, checked 2026-10-12.
+# Dollars per million tokens, from the pricing page, checked 2026-11-03.
 # Cache reads are priced per model, not as a fixed fraction of input: they
-# are 0.1x on most models but 0.05x on Opus 5.5 and 0.025x on Fable 5.1.
+# are 0.1x on most models but 0.05x on Opus 5.5 and Sonnet 5.5 and 0.025x on
+# Fable 5.1.  Haiku 5.5 is priced by prompt length: a request whose prompt
+# -- input, cache writes and cache reads together -- is over 100,000 tokens
+# pays the 'long' prices, all of it, cache hits included.
 # A model not in here still runs; its tokens are recorded and its cost is
 # left blank rather than guessed.
 const   our %PRICE                      => (
@@ -33,8 +36,11 @@ const   our %PRICE                      => (
         'claude-opus-5-5'               => { in =>  4.00, out => 20.00, cache_read => 0.20 },
         'claude-opus-5'                 => { in =>  5.00, out => 25.00, cache_read => 0.50 },
         'claude-opus-4-8'               => { in =>  5.00, out => 25.00, cache_read => 0.50 },
-        'claude-sonnet-5-5'             => { in =>  2.00, out => 10.00, cache_read => 0.20 },
+        'claude-sonnet-5-5'             => { in =>  2.00, out => 10.00, cache_read => 0.10 },
         'claude-sonnet-5'               => { in =>  2.00, out => 10.00, cache_read => 0.20 },
+        'claude-haiku-5-5'              => { in =>  0.10, out =>  0.50, cache_read => 0.01,
+                                             long => { over => 100_000,
+                                                       in => 0.50, out => 2.50, cache_read => 0.05 } },
         'claude-haiku-4-5'              => { in =>  1.00, out =>  5.00, cache_read => 0.10 },
         );
 
@@ -60,6 +66,13 @@ method cost ($usage, $for_model) {
     return undef if !exists $prices->{$for_model};                              ## no critic (ProhibitExplicitReturnUndef)
     my  $price                          = $prices->{$for_model};
     my  ($in, $write, $read, $out)      = token_counts ($usage);
+
+    # a prompt over the model's threshold, if it has one, is priced whole
+    # at the higher rates
+    # (exists, not a plain read: the table is restricted, and dies on a
+    # missing key)
+    $price                              = $price->{long}
+            if exists $price->{long} && $in + $write + $read > $price->{long}{over};
 
     # usage.cache_creation splits the writes by TTL when the API sends it;
     # without it, every write is taken to be a five-minute one

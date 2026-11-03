@@ -59,9 +59,19 @@ Perl 5.40 or later, and from CPAN: `Object::Pad` 0.825 or later,
 
 The modules sit at the top of the repository (`Anthropic.pm`,
 `Anthropic/Ledger.pm`), so the checkout itself is the `MAD/` directory.
-Copy or link it onto `@INC` as `MAD`.  To run the tests from inside it:
+Install them by copying them onto `@INC` as `MAD` -- a copy, not a link, so
+that what is in use changes only when it is installed again:
 
-    prove -I.. t/
+    install -d SITE_PERL/MAD/Anthropic
+    install -m 644 Anthropic.pm SITE_PERL/MAD/
+    install -m 644 Anthropic/Ledger.pm SITE_PERL/MAD/Anthropic/
+
+where `SITE_PERL` is that perl's site library (`perl -V:installsitelib`).
+To run the tests from inside the checkout, with the `prove` of the perl the
+modules are for (the system's may be another perl, without
+`Object::Pad`):
+
+    /opt/perl/bin/prove -I.. t/
 
 The tests use a stand-in for `HTTP::Tiny` and never call the API.
 

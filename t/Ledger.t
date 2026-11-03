@@ -38,6 +38,24 @@ near ($ledger->cost ({ %$USAGE, cache_creation => { ephemeral_1h_input_tokens =>
       (2_000 * 4 + 600 * 4 * 1.25 + 400 * 4 * 2 + 10_000 * 0.20 + 500 * 20) / 1e6,
       'one-hour cache writes at 2x');
 
+# Sonnet 5.5 reads at 0.05x of $2
+near ($ledger->cost ($USAGE, 'claude-sonnet-5-5'),
+      (2_000 * 2 + 1_000 * 2 * 1.25 + 10_000 * 0.10 + 500 * 10) / 1e6,
+      'sonnet 5.5 cost, cache read at 0.05x');
+
+# Haiku 5.5: $0.10 in, $0.50 out, $0.01 cache read, for a prompt up to 100,000 tokens
+near ($ledger->cost ($USAGE, 'claude-haiku-5-5'),
+      (2_000 * 0.10 + 1_000 * 0.10 * 1.25 + 10_000 * 0.01 + 500 * 0.50) / 1e6,
+      'haiku 5.5 cost');
+
+# over 100,000 tokens of prompt -- cache reads counted -- every token at the higher prices
+near ($ledger->cost ({ %$USAGE, cache_read_input_tokens => 97_001 }, 'claude-haiku-5-5'),
+      (2_000 * 0.50 + 1_000 * 0.50 * 1.25 + 97_001 * 0.05 + 500 * 2.50) / 1e6,
+      'haiku 5.5 over 100,000 tokens of prompt, cache reads included');
+near ($ledger->cost ({ %$USAGE, cache_read_input_tokens => 97_000 }, 'claude-haiku-5-5'),
+      (2_000 * 0.10 + 1_000 * 0.10 * 1.25 + 97_000 * 0.01 + 500 * 0.50) / 1e6,
+      'haiku 5.5 at exactly 100,000 tokens of prompt: the lower prices');
+
 is ($ledger->cost ($USAGE, 'claude-imaginary-9'), undef, 'unknown model: cost undef, not guessed');
 
 is ($ledger->report (), "nothing spent yet\n", 'report with no ledger');
